@@ -4,14 +4,20 @@ import time
 from typing import List, Dict, Optional
 
 class DataFetcher:
-    def __init__(self, exchange_id: str = 'binance', testnet: bool = False):
+    def __init__(self, exchange_id: str = 'binance', testnet: bool = False, api_key: str = "", api_secret: str = ""):
         """
         Initializes the data fetcher using CCXT.
         """
         exchange_class = getattr(ccxt, exchange_id)
-        self.exchange = exchange_class({
+        exchange_config = {
             'enableRateLimit': True,
-        })
+        }
+        if api_key and api_secret and api_key != "YOUR_API_KEY":
+            exchange_config['apiKey'] = api_key
+            exchange_config['secret'] = api_secret
+
+        self.exchange = exchange_class(exchange_config)
+
         if testnet and 'testnet' in self.exchange.urls:
             self.exchange.set_sandbox_mode(True)
 

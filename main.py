@@ -9,6 +9,7 @@ import os
 import torch
 import pandas as pd
 import numpy as np
+import requests
 from src.strategy.generator import ICTStrategy
 from src.execution.engine import ExecutionEngine
 from src.models.lstm_model import MultiTaskICTLSTM, ModelTrainer, ICTDataset
@@ -23,13 +24,17 @@ class TradingBotDaemon:
 
         self.fetcher = DataFetcher(
             exchange_id=self.config["exchange"]["name"],
-            testnet=False
+            testnet=False,
+            api_key=self.config["exchange"].get("api_key", ""),
+            api_secret=self.config["exchange"].get("api_secret", "")
         )
 
+        # In live mode, pass the initialized ccxt exchange object to the Execution Engine
         self.strategy = ICTStrategy(algorithm_version=self.config["trading"]["algorithm_version"])
         self.execution = ExecutionEngine(
             mode=self.config["trading"]["mode"],
-            risk_pct=self.config["trading"]["risk_per_trade_pct"]
+            risk_pct=self.config["trading"]["risk_per_trade_pct"],
+            exchange=self.fetcher.exchange
         )
 
         # Initialize Telegram Notifier (Mocked for now, integrate python-telegram-bot later)
@@ -67,9 +72,22 @@ class TradingBotDaemon:
 
     def _send_telegram_alert(self, message: str):
         if self.telegram_enabled:
-            # Here you would typically use `requests.post` or `python-telegram-bot`
-            # to send to the bot_token / chat_id.
-            logger.info(f"[TELEGRAM ALERT] {message}")
+            bot_token = self.config["telegram"].get("bot_token")
+            chat_id = self.config["telegram"].get("chat_id")
+            if bot_token and chat_id and bot_token != "YOUR_BOT_TOKEN":
+                url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+                payload = {
+                    "chat_id": chat_id,
+                    "text": message,
+                    "parse_mode": "HTML"
+                }
+                try:
+                    requests.post(url, json=payload, timeout=5)
+                    logger.info(f"[TELEGRAM ALERT] Successfully sent message.")
+                except Exception as e:
+                    logger.error(f"[TELEGRAM ALERT FAILED] {e}")
+            else:
+                logger.info(f"[TELEGRAM ALERT MOCKED] {message}")
 
     def run_cycle(self):
         """

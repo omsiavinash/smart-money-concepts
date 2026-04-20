@@ -2,15 +2,17 @@ import logging
 from typing import Dict, Any, Optional
 
 class ExecutionEngine:
-    def __init__(self, mode: str = "paper", risk_pct: float = 1.0, account_balance: float = 10000.0):
+    def __init__(self, mode: str = "paper", risk_pct: float = 1.0, account_balance: float = 10000.0, exchange=None):
         """
         mode: "paper" or "live"
         risk_pct: Percentage of account balance to risk per trade (e.g., 1.0 for 1%)
         account_balance: Starting balance for paper trading
+        exchange: The initialized ccxt exchange object for live trading
         """
         self.mode = mode
         self.risk_pct = risk_pct
         self.account_balance = account_balance
+        self.exchange = exchange
         self.positions = []
 
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -101,7 +103,26 @@ class ExecutionEngine:
 
         elif self.mode == "live":
             self.logger.info(f"[LIVE TRADE] Sending order to exchange for {symbol}...")
-            # CCXT Exchange logic would go here
-            return trade_details
+            if not self.exchange:
+                self.logger.error("Exchange instance not provided for live trading. Cannot execute.")
+                return None
+
+            try:
+                # Basic market order implementation
+                if action == "BUY":
+                    order = self.exchange.create_market_buy_order(symbol, qty)
+                else:
+                    order = self.exchange.create_market_sell_order(symbol, qty)
+
+                self.logger.info(f"[LIVE TRADE SUCCESS] Order id: {order.get('id')} placed successfully.")
+
+                # Note: In a full production environment you would also create stop loss and take profit orders here.
+                # E.g. self.exchange.create_order(symbol, 'stop_loss', 'sell' if action=='BUY' else 'buy', qty, None, {'stopPrice': levels['sl']})
+
+                trade_details['exchange_response'] = order
+                return trade_details
+            except Exception as e:
+                self.logger.error(f"[LIVE TRADE FAILED] Error executing {action} on {symbol}: {e}")
+                return None
 
         return None
