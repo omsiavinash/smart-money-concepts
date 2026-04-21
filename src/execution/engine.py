@@ -93,7 +93,8 @@ class ExecutionEngine:
             "stop_loss": levels["sl"],
             "take_profit": levels["tp"],
             "confidence": signal["confidence"],
-            "version": signal["version"]
+            "version": signal["version"],
+            "reasons": signal.get("reasons", [])
         }
 
         if self.mode == "paper":

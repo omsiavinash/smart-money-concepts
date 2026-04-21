@@ -38,18 +38,22 @@ class ICTStrategy:
 
         # Check optional tiers
         confirmations = 0
+        reasons = [f"Mandatory: {'Bullish' if direction == 1 else 'Bearish'} Market Structure Shift"]
 
         # 1. FVG presence in the same direction
         if current.get('fvg') == direction:
             confirmations += 1
+            reasons.append("Optional: Fair Value Gap aligned")
 
         # 2. HTF Liquidity Grab in the same direction
         if htf.get('liquidity_grab') == direction:
             confirmations += 1
+            reasons.append("Optional: HTF Liquidity Grab aligned")
 
         # 3. POI / Order Block in the same direction
         if current.get('ob') == direction or htf.get('ob') == direction:
             confirmations += 1
+            reasons.append("Optional: Order Block / POI aligned")
 
         # Must have at least 1 optional confirmation
         if confirmations >= 1:
@@ -59,7 +63,8 @@ class ICTStrategy:
                 "action": "BUY" if direction == 1 else "SELL",
                 "confidence": 0.7 + (0.1 * confirmations), # pseudo-confidence score
                 "version": "v4",
-                "tier_confirmations": confirmations + 2 # +2 for MSS and R:R
+                "tier_confirmations": confirmations + 2, # +2 for MSS and R:R
+                "reasons": reasons
             }
 
         return None
@@ -78,17 +83,28 @@ class ICTStrategy:
             return None
 
         confirmations = 0
-        if current.get('fvg') == direction: confirmations += 1
-        if current.get('ob') == direction: confirmations += 1
-        if current.get('liquidity_grab') == direction: confirmations += 1
-        if current.get('premium_discount') == (1 if direction == 1 else -1): confirmations += 1
+        reasons = [f"Mandatory: {'Bullish' if direction == 1 else 'Bearish'} Market Structure Shift"]
+
+        if current.get('fvg') == direction:
+            confirmations += 1
+            reasons.append("Fair Value Gap")
+        if current.get('ob') == direction:
+            confirmations += 1
+            reasons.append("Order Block")
+        if current.get('liquidity_grab') == direction:
+            confirmations += 1
+            reasons.append("Liquidity Grab")
+        if current.get('premium_discount') == (1 if direction == 1 else -1):
+            confirmations += 1
+            reasons.append("Premium/Discount alignment")
 
         if confirmations >= 2: # MSS (1) + 2 others = 3/5
             return {
                 "action": "BUY" if direction == 1 else "SELL",
                 "confidence": 0.62 + (0.05 * confirmations),
                 "version": "v3",
-                "tier_confirmations": confirmations + 1
+                "tier_confirmations": confirmations + 1,
+                "reasons": reasons
             }
 
         return None

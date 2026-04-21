@@ -155,7 +155,8 @@ class TradingBotDaemon:
 
             if signal:
                 logger.info(f"Signal generated on {symbol}: {signal}")
-                self._send_telegram_alert(f"🚨 Signal Alert: {signal['action']} {symbol} (Conf: {signal['confidence']:.2f})")
+                reasons_str = "\n".join([f"- {r}" for r in signal.get("reasons", [])])
+                self._send_telegram_alert(f"🚨 Signal Alert: {signal['action']} {symbol} (Conf: {signal['confidence']:.2f})\n<b>Confirmations:</b>\n{reasons_str}")
 
                 # 4. Execution & Risk Management
                 # Pass recent swing levels for SL calculation
@@ -167,7 +168,12 @@ class TradingBotDaemon:
 
                 trade = self.execution.execute_trade(symbol, signal, market_data)
                 if trade:
-                    trade_msg = f"✅ Trade Executed: {trade['action']} {trade['quantity']} {symbol} @ {trade['entry_price']:.2f}\nSL: {trade['stop_loss']:.2f}\nTP: {trade['take_profit']:.2f}"
+                    trade_msg = (
+                        f"✅ Trade Executed: {trade['action']} {trade['quantity']} {symbol} @ {trade['entry_price']:.2f}\n"
+                        f"SL: {trade['stop_loss']:.2f}\n"
+                        f"TP: {trade['take_profit']:.2f}\n\n"
+                        f"<b>Trade Setup Context:</b>\n{reasons_str}"
+                    )
                     self._send_telegram_alert(trade_msg)
 
     def start(self, interval_seconds: int = 900): # 900s = 15m
