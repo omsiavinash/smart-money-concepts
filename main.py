@@ -222,5 +222,4 @@ class TradingBotDaemon:
 
 if __name__ == "__main__":
     bot = TradingBotDaemon()
-    # For testing, we run one cycle and exit. In production, call bot.start()
-    bot.run_cycle()
+    bot.start()
