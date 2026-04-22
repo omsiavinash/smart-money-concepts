@@ -18,11 +18,21 @@ class ExecutionEngine:
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
         self.logger = logging.getLogger(__name__)
 
-    def calculate_position_size(self, entry_price: float, stop_loss: float) -> float:
+    def calculate_position_size(self, symbol: str, entry_price: float, stop_loss: float) -> float:
         """
         Calculates the position size based on account balance and risk percentage.
         """
-        risk_amount = self.account_balance * (self.risk_pct / 100)
+        balance = self.account_balance
+        if self.mode == "live" and self.exchange:
+            try:
+                # Fetch actual live balance for the quote currency (e.g. USDT in BTC/USDT)
+                quote_currency = symbol.split('/')[1]
+                free_balance = self.exchange.fetch_free_balance()
+                balance = float(free_balance.get(quote_currency, 0.0))
+            except Exception as e:
+                self.logger.warning(f"Failed to fetch live balance: {e}. Falling back to default balance.")
+
+        risk_amount = balance * (self.risk_pct / 100)
         risk_per_unit = abs(entry_price - stop_loss)
 
         if risk_per_unit == 0:
@@ -83,9 +93,11 @@ class ExecutionEngine:
             self.logger.warning(f"Signal rejected: Did not meet minimum R:R of 1:{min_rr}")
             return None
 
-        qty = self.calculate_position_size(levels["entry"], levels["sl"])
+        qty = self.calculate_position_size(symbol, levels["entry"], levels["sl"])
 
+        import datetime
         trade_details = {
+            "timestamp": datetime.datetime.now().isoformat(),
             "symbol": symbol,
             "action": action,
             "quantity": round(qty, 4),
@@ -94,12 +106,14 @@ class ExecutionEngine:
             "take_profit": levels["tp"],
             "confidence": signal["confidence"],
             "version": signal["version"],
-            "reasons": signal.get("reasons", [])
+            "reasons": "; ".join(signal.get("reasons", [])),
+            "mode": self.mode
         }
 
         if self.mode == "paper":
             self.logger.info(f"[PAPER TRADE] Executing {action} on {symbol}: Qty {qty:.4f} @ {current_price:.2f} | SL: {levels['sl']:.2f} | TP: {levels['tp']:.2f}")
             self.positions.append(trade_details)
+            self._save_trade(trade_details)
             return trade_details
 
         elif self.mode == "live":
@@ -120,10 +134,25 @@ class ExecutionEngine:
                 # Note: In a full production environment you would also create stop loss and take profit orders here.
                 # E.g. self.exchange.create_order(symbol, 'stop_loss', 'sell' if action=='BUY' else 'buy', qty, None, {'stopPrice': levels['sl']})
 
-                trade_details['exchange_response'] = order
+                trade_details['exchange_response_id'] = order.get('id')
+                self.positions.append(trade_details)
+                self._save_trade(trade_details)
                 return trade_details
             except Exception as e:
                 self.logger.error(f"[LIVE TRADE FAILED] Error executing {action} on {symbol}: {e}")
                 return None
 
         return None
+
+    def _save_trade(self, trade_details: Dict[str, Any]):
+        """Saves executed trade to local CSV for dashboard tracking."""
+        import pandas as pd
+        import os
+
+        file_path = "data/trades.csv"
+        df_new = pd.DataFrame([trade_details])
+
+        if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
+            df_new.to_csv(file_path, mode='a', header=False, index=False)
+        else:
+            df_new.to_csv(file_path, mode='w', header=True, index=False)

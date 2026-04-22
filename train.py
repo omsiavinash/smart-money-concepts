@@ -82,7 +82,18 @@ def train_model(config_path="config.json", data_path="data/training_data.csv"):
     model_path = config["model"]["model_path"]
     os.makedirs(os.path.dirname(model_path), exist_ok=True)
     trainer.save_model(model_path)
+
+    # Save the global scaler for inference consistency
+    scaler_path = os.path.join(os.path.dirname(model_path), "scaler.json")
+    scaler_data = {
+        "mean": dataset.data_mean.to_dict(),
+        "std": dataset.data_std.to_dict()
+    }
+    with open(scaler_path, "w") as f:
+        json.dump(scaler_data, f)
+
     logger.info(f"Model saved successfully to {model_path}")
+    logger.info(f"Scaler saved successfully to {scaler_path}")
 
 if __name__ == "__main__":
     train_model()

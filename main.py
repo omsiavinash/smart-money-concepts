@@ -62,12 +62,21 @@ class TradingBotDaemon:
         )
         self.trainer = ModelTrainer(self.ai_model, learning_rate=self.config["model"]["learning_rate"])
 
+        import json
         model_path = self.config["model"]["model_path"]
-        if os.path.exists(model_path):
+        scaler_path = os.path.join(os.path.dirname(model_path), "scaler.json")
+
+        if os.path.exists(model_path) and os.path.exists(scaler_path):
             self.trainer.load_model(model_path)
-            logger.info(f"Loaded trained AI model from {model_path}")
+
+            with open(scaler_path, "r") as f:
+                scaler_data = json.load(f)
+                self.scaler_mean = pd.Series(scaler_data["mean"])
+                self.scaler_std = pd.Series(scaler_data["std"])
+
+            logger.info(f"Loaded trained AI model and global scaler from {os.path.dirname(model_path)}")
         else:
-            logger.warning(f"AI Model not found at {model_path}. Please run train.py first. Proceeding with deterministic logic fallback.")
+            logger.warning(f"AI Model or Scaler not found at {model_path}. Please run train.py first. Proceeding with deterministic logic fallback.")
             self.ai_model = None
 
     def _send_telegram_alert(self, message: str):
@@ -120,10 +129,8 @@ class TradingBotDaemon:
             current_data = base_features_df.iloc[-1].to_dict()
 
             if self.ai_model is not None and len(base_features_df) >= self.seq_length:
-                # Normalize inputs exactly as in training
-                data_mean = base_features_df[self.feature_cols].mean()
-                data_std = base_features_df[self.feature_cols].std()
-                normalized_features = (base_features_df[self.feature_cols] - data_mean) / (data_std + 1e-8)
+                # Normalize inputs using the global scaler saved during training
+                normalized_features = (base_features_df[self.feature_cols] - self.scaler_mean) / (self.scaler_std + 1e-8)
 
                 # Get the last sequence
                 x_seq = normalized_features.values[-self.seq_length:]
@@ -158,6 +165,9 @@ class TradingBotDaemon:
                 reasons_str = "\n".join([f"- {r}" for r in signal.get("reasons", [])])
                 self._send_telegram_alert(f"🚨 Signal Alert: {signal['action']} {symbol} (Conf: {signal['confidence']:.2f})\n<b>Confirmations:</b>\n{reasons_str}")
 
+                # Save signal to CSV for dashboard
+                self._save_signal(symbol, signal)
+
                 # 4. Execution & Risk Management
                 # Pass recent swing levels for SL calculation
                 market_data = {
@@ -175,6 +185,26 @@ class TradingBotDaemon:
                         f"<b>Trade Setup Context:</b>\n{reasons_str}"
                     )
                     self._send_telegram_alert(trade_msg)
+
+    def _save_signal(self, symbol: str, signal: dict):
+        import datetime
+        import pandas as pd
+        import os
+
+        file_path = "data/signals.csv"
+        sig_data = {
+            "timestamp": datetime.datetime.now().isoformat(),
+            "symbol": symbol,
+            "action": signal["action"],
+            "confidence": signal["confidence"],
+            "version": signal["version"],
+            "reasons": "; ".join(signal.get("reasons", []))
+        }
+        df_new = pd.DataFrame([sig_data])
+        if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
+            df_new.to_csv(file_path, mode='a', header=False, index=False)
+        else:
+            df_new.to_csv(file_path, mode='w', header=True, index=False)
 
     def start(self, interval_seconds: int = 900): # 900s = 15m
         """
