@@ -70,6 +70,8 @@ def run_backtest(data_path="data/training_data.csv", config_path="config.json"):
     losses = 0
     total_trades = 0
 
+    trade_log = []
+
     logger.info("Starting backtest simulation over historical data...")
 
     # We will step through the dataframe row by row, starting from seq_length
@@ -100,6 +102,10 @@ def run_backtest(data_path="data/training_data.csv", config_path="config.json"):
             action = signal['action']
             entry_price = current_data['close']
 
+            # Track HTF context
+            direction = 1 if action == "BUY" else -1
+            htf_aligned = (htf_data['liquidity_grab'] == direction) or (htf_data['ob'] == direction)
+
             # Simple TP/SL calculation for backtest
             min_rr = 3.0 if config["trading"]["algorithm_version"] == "v4" else 1.2
             if action == "BUY":
@@ -115,45 +121,110 @@ def run_backtest(data_path="data/training_data.csv", config_path="config.json"):
             future_df = df.iloc[i:min(i+50, len(df))]
 
             outcome = "TIMED_OUT"
+            pnl_val = 0.0
+
             for _, row in future_df.iterrows():
                 if action == "BUY":
                     if row['low'] <= sl:
                         outcome = "LOSS"
+                        pnl_val = -risk_amount
                         balance -= risk_amount
                         losses += 1
                         break
                     elif row['high'] >= tp:
                         outcome = "WIN"
-                        balance += (risk_amount * min_rr)
+                        pnl_val = (risk_amount * min_rr)
+                        balance += pnl_val
                         wins += 1
                         break
                 elif action == "SELL":
                     if row['high'] >= sl:
                         outcome = "LOSS"
+                        pnl_val = -risk_amount
                         balance -= risk_amount
                         losses += 1
                         break
                     elif row['low'] <= tp:
                         outcome = "WIN"
-                        balance += (risk_amount * min_rr)
+                        pnl_val = (risk_amount * min_rr)
+                        balance += pnl_val
                         wins += 1
                         break
+
+            trade_log.append({
+                "timestamp": window_df.index[-1],
+                "action": action,
+                "entry_price": entry_price,
+                "outcome": outcome,
+                "pnl": pnl_val,
+                "htf_aligned": htf_aligned
+            })
 
     # Final Report
     win_rate = (wins / total_trades * 100) if total_trades > 0 else 0
     pnl = balance - initial_balance
     pnl_pct = (pnl / initial_balance) * 100
 
-    print("\n" + "="*50)
+    print("\n" + "="*60)
     print("🎯 ICT-AI BOT BACKTEST REPORT")
-    print("="*50)
+    print("="*60)
     print(f"Total Trades Taken: {total_trades}")
     print(f"Wins: {wins} | Losses: {losses}")
     print(f"Win Rate: {win_rate:.2f}%")
     print(f"Starting Balance: ${initial_balance:,.2f}")
     print(f"Ending Balance:   ${balance:,.2f}")
     print(f"Total P/L:        ${pnl:,.2f} ({pnl_pct:.2f}%)")
-    print("="*50 + "\n")
+    print("="*60)
+
+    if total_trades > 0:
+        trades_df = pd.DataFrame(trade_log)
+        trades_df['timestamp'] = pd.to_datetime(trades_df['timestamp'])
+
+        # 1. Performance by Signal Type (Action)
+        print("\n📊 PERFORMANCE BY SIGNAL TYPE:")
+        action_group = trades_df.groupby('action').agg(
+            Trades=('action', 'count'),
+            Wins=('outcome', lambda x: (x == 'WIN').sum()),
+            PnL=('pnl', 'sum')
+        )
+        action_group['Win Rate (%)'] = (action_group['Wins'] / action_group['Trades'] * 100).round(2)
+        print(action_group.to_string())
+
+        # 2. Performance by HTF Alignment
+        print("\n🔍 PERFORMANCE BY HTF ALIGNMENT:")
+        htf_group = trades_df.groupby('htf_aligned').agg(
+            Trades=('htf_aligned', 'count'),
+            Wins=('outcome', lambda x: (x == 'WIN').sum()),
+            PnL=('pnl', 'sum')
+        )
+        htf_group.index = htf_group.index.map({True: 'Aligned', False: 'Not Aligned'})
+        htf_group['Win Rate (%)'] = (htf_group['Wins'] / htf_group['Trades'] * 100).round(2)
+        print(htf_group.to_string())
+
+        # 3. Performance by Time of Year (Month)
+        print("\n📅 PERFORMANCE BY MONTH:")
+        trades_df['Month'] = trades_df['timestamp'].dt.strftime('%b')
+        month_group = trades_df.groupby('Month').agg(
+            Trades=('Month', 'count'),
+            PnL=('pnl', 'sum')
+        )
+        print(month_group.to_string())
+
+        # 4. Performance by Price Range
+        print("\n📈 PERFORMANCE BY PRICE RANGE:")
+        try:
+            trades_df['Price Tier'] = pd.qcut(trades_df['entry_price'], q=3, labels=['Low', 'Medium', 'High'])
+            price_group = trades_df.groupby('Price Tier').agg(
+                Trades=('entry_price', 'count'),
+                Wins=('outcome', lambda x: (x == 'WIN').sum()),
+                PnL=('pnl', 'sum')
+            )
+            price_group['Win Rate (%)'] = (price_group['Wins'] / price_group['Trades'] * 100).round(2)
+            print(price_group.to_string())
+        except Exception:
+            print("Not enough price variance to calculate price tiers.")
+
+    print("="*60 + "\n")
 
 if __name__ == "__main__":
     run_backtest()
