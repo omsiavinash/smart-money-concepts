@@ -59,5 +59,21 @@ def main():
         else:
             st.info("No trades executed yet.")
 
+    st.divider()
+    st.subheader("🧠 Bot 'Live Brain' Output Log")
+    if os.path.exists("data/bot_logs.csv") and os.path.getsize("data/bot_logs.csv") > 0:
+        try:
+            logs_df = pd.read_csv("data/bot_logs.csv")
+            # Show the last 25 thought processes in a scrolling text area
+            recent_logs = logs_df.tail(25).iloc[::-1]
+            log_text = ""
+            for idx, row in recent_logs.iterrows():
+                log_text += f"[{row['timestamp']}] {row['symbol']}: {row['message']}\n"
+            st.text_area("Latest Operations", log_text, height=300)
+        except pd.errors.EmptyDataError:
+            st.info("No bot logs generated yet. Ensure main.py is running.")
+    else:
+        st.info("No bot logs generated yet. Ensure main.py is running.")
+
 if __name__ == "__main__":
     main()

@@ -107,14 +107,15 @@ class TradingBotDaemon:
         htf_tfs = self.config["trading"]["htf_timeframes"]
 
         for symbol in symbols:
-            logger.info(f"Analyzing {symbol}...")
+            self._log_thought_process(symbol, f"Starting analysis cycle for {symbol} on {base_tf} timeframe.")
 
             # 1. Fetch Multi-Timeframe Data
             all_timeframes = [base_tf] + htf_tfs
             try:
                 data_dict = self.fetcher.fetch_multi_timeframe_data(symbol, all_timeframes, limit=100)
+                self._log_thought_process(symbol, f"Successfully fetched 100 recent candles for {all_timeframes}.")
             except Exception as e:
-                logger.error(f"Failed to fetch data for {symbol}: {e}")
+                self._log_thought_process(symbol, f"Failed to fetch data: {e}")
                 continue
 
             if base_tf not in data_dict:
@@ -126,14 +127,15 @@ class TradingBotDaemon:
             base_features_df = features_engine.generate_all_features()
 
             # Use AI Model for inference if available, otherwise use deterministic features
-            current_data = base_features_df.iloc[-1].to_dict()
+            # Use iloc[-2] to evaluate the most recently CLOSED candle. iloc[-1] is the current open/forming candle.
+            current_data = base_features_df.iloc[-2].to_dict()
 
             if self.ai_model is not None and len(base_features_df) >= self.seq_length:
                 # Normalize inputs using the global scaler saved during training
                 normalized_features = (base_features_df[self.feature_cols] - self.scaler_mean) / (self.scaler_std + 1e-8)
 
-                # Get the last sequence
-                x_seq = normalized_features.values[-self.seq_length:]
+                # Get the last sequence (ending at the closed candle)
+                x_seq = normalized_features.values[-self.seq_length - 1:-1]
 
                 # Predict
                 predictions = self.trainer.predict(x_seq)
@@ -141,28 +143,62 @@ class TradingBotDaemon:
                 # Override deterministic labels with AI predictions
                 for i, col in enumerate(self.target_cols):
                     current_data[col] = predictions[i]
-                logger.debug(f"AI Predictions for {symbol}: {predictions}")
+                self._log_thought_process(symbol, f"AI Model inferred ICT concepts: MSS={predictions[0]}, FVG={predictions[1]}, OB={predictions[2]}.")
+            else:
+                self._log_thought_process(symbol, f"Using standard deterministic math for ICT detection (AI Model unavailable).")
 
             # Calculate HTF Features
             # We aggregate HTF concepts to pass to the strategy generator
-            htf_data = {}
+            htf_data = {'liquidity_grab': 0, 'ob': 0}
             for htf in htf_tfs:
                 if htf in data_dict:
                     htf_engine = ICTFeatures(data_dict[htf])
                     htf_df = htf_engine.generate_all_features()
 
-                    # Store latest HTF state
-                    latest_htf = htf_df.iloc[-1]
-                    htf_data['liquidity_grab'] = latest_htf.get('liquidity_grab', 0)
-                    htf_data['ob'] = latest_htf.get('ob', 0)
-                    # We just keep the most relevant/highest timeframe state for simplicity here
+                    # Evaluate the closed candle for HTF as well
+                    latest_htf = htf_df.iloc[-2]
+
+                    # If we find a confirmation on ANY higher timeframe, save it. Don't overwrite it with a missing confirmation on a higher-higher timeframe.
+                    if latest_htf.get('liquidity_grab', 0) != 0:
+                        htf_data['liquidity_grab'] = latest_htf['liquidity_grab']
+                    if latest_htf.get('ob', 0) != 0:
+                        htf_data['ob'] = latest_htf['ob']
 
             # 3. Strategy & Signal Generation
             signal = self.strategy.generate_signal(current_data, htf_data)
 
-            if signal:
-                logger.info(f"Signal generated on {symbol}: {signal}")
+            # Log the step-by-step thinking process regardless of whether a signal was generated
+            for thought in signal.get("thought_process", []):
+                self._log_thought_process(symbol, thought)
+
+            if signal.get("action") is None:
+                continue
+
+            if signal.get("action"):
+                # Stale Signal Checking
+                candle_timestamp_utc = pd.to_datetime(base_features_df.index[-2], utc=True)
+                current_time_utc = pd.Timestamp.utcnow()
+
+                # Parse timeframe safely into minutes
+                tf_minutes = 15 # default
+                if base_tf.endswith('m'): tf_minutes = int(base_tf[:-1])
+                elif base_tf.endswith('h'): tf_minutes = int(base_tf[:-1]) * 60
+                elif base_tf.endswith('d'): tf_minutes = int(base_tf[:-1]) * 1440
+                elif base_tf.endswith('w'): tf_minutes = int(base_tf[:-1]) * 10080
+
+                # CCXT timestamp is the OPEN time. So the candle closes at timestamp + duration.
+                # The time since it closed is the total age minus its duration.
+                age_since_open_minutes = (current_time_utc - candle_timestamp_utc).total_seconds() / 60.0
+                age_since_close_minutes = age_since_open_minutes - tf_minutes
+
+                # If the candle closed more than a few minutes ago (e.g., 5 min grace period), skip it
+                if age_since_close_minutes > 5.0:
+                    self._log_thought_process(symbol, f"⚠️ Valid Signal Generated, BUT candle is STALE! Closed {age_since_close_minutes:.1f} mins ago. Discarding trade.")
+                    continue
+
                 reasons_str = "\n".join([f"- {r}" for r in signal.get("reasons", [])])
+                self._log_thought_process(symbol, f"🔥 Valid Signal Generated! Action: {signal['action']} | Confidence: {signal['confidence']:.2f}\nConfirmations:\n{reasons_str}")
+
                 self._send_telegram_alert(f"🚨 Signal Alert: {signal['action']} {symbol} (Conf: {signal['confidence']:.2f})\n<b>Confirmations:</b>\n{reasons_str}")
 
                 # Save signal to CSV for dashboard
@@ -185,6 +221,26 @@ class TradingBotDaemon:
                         f"<b>Trade Setup Context:</b>\n{reasons_str}"
                     )
                     self._send_telegram_alert(trade_msg)
+
+    def _log_thought_process(self, symbol: str, message: str):
+        """Saves detailed bot logic to a log file for the Streamlit dashboard."""
+        import os
+        import pandas as pd
+        import datetime
+        file_path = "data/bot_logs.csv"
+
+        log_data = {
+            "timestamp": datetime.datetime.now().isoformat(),
+            "symbol": symbol,
+            "message": message
+        }
+        df_new = pd.DataFrame([log_data])
+        if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
+            df_new.to_csv(file_path, mode='a', header=False, index=False)
+        else:
+            df_new.to_csv(file_path, mode='w', header=True, index=False)
+
+        logger.info(message)
 
     def _save_signal(self, symbol: str, signal: dict):
         import datetime

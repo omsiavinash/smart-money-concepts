@@ -97,7 +97,7 @@ def run_backtest(data_path="data/training_data.csv", config_path="config.json"):
         # Generate Signal
         signal = strategy.generate_signal(current_data, htf_data)
 
-        if signal:
+        if signal and signal.get('action') is not None:
             total_trades += 1
             action = signal['action']
             entry_price = current_data['close']
