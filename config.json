@@ -28,6 +28,6 @@
         "batch_size": 32,
         "epochs": 100,
         "model_path": "models/ict_lstm_model.pth",
-        "use_ai_inference": false
+        "use_ai_inference": true
     }
 }

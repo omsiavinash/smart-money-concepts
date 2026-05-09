@@ -135,6 +135,9 @@ class TradingBotDaemon:
             o, h, l, c = current_data.get('open', 0), current_data.get('high', 0), current_data.get('low', 0), current_data.get('close', 0)
             self._log_thought_process(symbol, f"Candle closed at OHLC: [{o:.4f}, {h:.4f}, {l:.4f}, {c:.4f}]")
 
+            # To capture raw math before AI overrides it
+            raw_math_data = current_data.copy()
+
             if self.ai_model is not None and len(base_features_df) >= self.seq_length and use_ai:
                 # Normalize inputs using the global scaler saved during training
                 normalized_features = (base_features_df[self.feature_cols] - self.scaler_mean) / (self.scaler_std + 1e-8)
@@ -157,7 +160,11 @@ class TradingBotDaemon:
                 for i, col in enumerate(self.target_cols):
                     current_data[col] = predictions[i]
             else:
+                predictions = []
                 self._log_thought_process(symbol, f"Using standard deterministic math for ICT detection. (AI Mode: {'ON' if use_ai else 'OFF'})")
+
+            # Log continuous market data ledger (using raw math data to preserve what math saw before AI override)
+            self._save_candle_data(symbol, base_features_df.index[-2].isoformat(), raw_math_data, predictions)
 
             # Calculate HTF Features
             # We aggregate HTF concepts to pass to the strategy generator
@@ -256,6 +263,37 @@ class TradingBotDaemon:
 
         logger.info(message)
 
+    def _save_candle_data(self, symbol: str, timestamp: str, current_data: dict, predictions: list):
+        """Saves a continuous ledger of every single closed candle, its calculated math features, and its AI predictions."""
+        import os
+        import pandas as pd
+        file_path = "data/market_history.csv"
+
+        # Prepare the row data
+        row_data = {
+            "timestamp": timestamp,
+            "symbol": symbol,
+            "open": current_data.get('open', 0),
+            "high": current_data.get('high', 0),
+            "low": current_data.get('low', 0),
+            "close": current_data.get('close', 0),
+            "volume": current_data.get('volume', 0),
+            "math_mss": current_data.get('mss', 0),
+            "math_fvg": current_data.get('fvg', 0),
+            "math_ob": current_data.get('ob', 0),
+            "math_liquidity_grab": current_data.get('liquidity_grab', 0),
+            "ai_mss": predictions[0] if len(predictions) > 0 else 0,
+            "ai_fvg": predictions[1] if len(predictions) > 0 else 0,
+            "ai_ob": predictions[2] if len(predictions) > 0 else 0,
+            "ai_liquidity_grab": predictions[3] if len(predictions) > 0 else 0
+        }
+
+        df_new = pd.DataFrame([row_data])
+        if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
+            df_new.to_csv(file_path, mode='a', header=False, index=False)
+        else:
+            df_new.to_csv(file_path, mode='w', header=True, index=False)
+
     def _save_signal(self, symbol: str, signal: dict):
         import datetime
         import pandas as pd
@@ -289,16 +327,41 @@ class TradingBotDaemon:
         elif base_tf.endswith('h'): tf_minutes = int(base_tf[:-1]) * 60
         elif base_tf.endswith('d'): tf_minutes = int(base_tf[:-1]) * 1440
 
-        interval_seconds = tf_minutes * 60
-
         while True:
             try:
                 self.run_cycle()
             except Exception as e:
                 logger.error(f"Error in main loop: {e}")
 
-            logger.info(f"Sleeping for {interval_seconds} seconds ({tf_minutes} minutes)...")
-            time.sleep(interval_seconds)
+            # Synchronize with the next candle close
+            import datetime
+            import math
+            now = datetime.datetime.now(datetime.timezone.utc)
+            minutes_passed = now.minute + (now.hour * 60)
+
+            # Find the next interval boundary
+            next_interval_minutes = math.ceil((minutes_passed + 1e-9) / tf_minutes) * tf_minutes
+
+            # Create a datetime object for the exact next boundary
+            next_run_time = now.replace(hour=(next_interval_minutes // 60) % 24,
+                                      minute=next_interval_minutes % 60,
+                                      second=0, microsecond=0)
+
+            # If the calculation rolled over to the next day
+            if next_interval_minutes >= 1440 and now.hour > 0:
+                next_run_time += datetime.timedelta(days=1)
+
+            # Add a 2-second buffer to ensure the exchange API has finalised the closed candle
+            next_run_time += datetime.timedelta(seconds=2)
+
+            sleep_seconds = (next_run_time - now).total_seconds()
+
+            # Fallback failsafe
+            if sleep_seconds <= 0:
+                sleep_seconds = tf_minutes * 60
+
+            logger.info(f"Syncing to clock: Sleeping for {sleep_seconds:.1f} seconds until next {base_tf} candle closes...")
+            time.sleep(sleep_seconds)
 
 if __name__ == "__main__":
     bot = TradingBotDaemon()
