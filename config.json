@@ -27,6 +27,7 @@
         "learning_rate": 0.001,
         "batch_size": 32,
         "epochs": 100,
-        "model_path": "models/ict_lstm_model.pth"
+        "model_path": "models/ict_lstm_model.pth",
+        "use_ai_inference": false
     }
 }

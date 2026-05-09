@@ -130,7 +130,9 @@ class TradingBotDaemon:
             # Use iloc[-2] to evaluate the most recently CLOSED candle. iloc[-1] is the current open/forming candle.
             current_data = base_features_df.iloc[-2].to_dict()
 
-            if self.ai_model is not None and len(base_features_df) >= self.seq_length:
+            use_ai = self.config["model"].get("use_ai_inference", True)
+
+            if self.ai_model is not None and len(base_features_df) >= self.seq_length and use_ai:
                 # Normalize inputs using the global scaler saved during training
                 normalized_features = (base_features_df[self.feature_cols] - self.scaler_mean) / (self.scaler_std + 1e-8)
 
@@ -140,12 +142,19 @@ class TradingBotDaemon:
                 # Predict
                 predictions = self.trainer.predict(x_seq)
 
+                # Diagnostic Comparison
+                math_mss = current_data.get('mss', 0)
+                math_fvg = current_data.get('fvg', 0)
+                math_ob = current_data.get('ob', 0)
+
+                self._log_thought_process(symbol, f"[DIAGNOSTIC] Math logic found: MSS={math_mss}, FVG={math_fvg}, OB={math_ob}")
+                self._log_thought_process(symbol, f"[DIAGNOSTIC] AI Model predicted: MSS={predictions[0]}, FVG={predictions[1]}, OB={predictions[2]}")
+
                 # Override deterministic labels with AI predictions
                 for i, col in enumerate(self.target_cols):
                     current_data[col] = predictions[i]
-                self._log_thought_process(symbol, f"AI Model inferred ICT concepts: MSS={predictions[0]}, FVG={predictions[1]}, OB={predictions[2]}.")
             else:
-                self._log_thought_process(symbol, f"Using standard deterministic math for ICT detection (AI Model unavailable).")
+                self._log_thought_process(symbol, f"Using standard deterministic math for ICT detection. (AI Mode: {'ON' if use_ai else 'OFF'})")
 
             # Calculate HTF Features
             # We aggregate HTF concepts to pass to the strategy generator
