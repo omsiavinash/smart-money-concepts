@@ -57,7 +57,9 @@ class ICTStrategy:
         process_log.append("Checking for Fair Value Gap (FVG)...")
         if current.get('fvg') == direction:
             confirmations += 1
-            reason = f"Optional: {'Bullish' if direction == 1 else 'Bearish'} Fair Value Gap (FVG) aligned near price {close_price:.4f}."
+            fvg_upper = current.get('fvg_upper', 0.0)
+            fvg_lower = current.get('fvg_lower', 0.0)
+            reason = f"Optional: {'Bullish' if direction == 1 else 'Bearish'} Fair Value Gap (FVG) aligned [Zone: {fvg_lower:.4f} - {fvg_upper:.4f}]."
             reasons.append(reason)
             process_log.append(f"Detected. {reason}")
         else:
@@ -77,7 +79,16 @@ class ICTStrategy:
         process_log.append("Checking for Order Block (POI)...")
         if current.get('ob') == direction or htf.get('ob') == direction:
             confirmations += 1
-            reason = f"Optional: {'Bullish' if direction == 1 else 'Bearish'} Order Block (Institutional POI) aligned."
+            ob_upper = current.get('ob_upper', 0.0)
+            ob_lower = current.get('ob_lower', 0.0)
+            ob_htf_upper = htf.get('ob_upper', 0.0)
+            ob_htf_lower = htf.get('ob_lower', 0.0)
+
+            # Use current OB range if it triggered, else use the HTF OB range
+            upper = ob_upper if current.get('ob') == direction else ob_htf_upper
+            lower = ob_lower if current.get('ob') == direction else ob_htf_lower
+
+            reason = f"Optional: {'Bullish' if direction == 1 else 'Bearish'} Order Block aligned [Zone: {lower:.4f} - {upper:.4f}]."
             reasons.append(reason)
             process_log.append(f"Detected. {reason}")
         else:

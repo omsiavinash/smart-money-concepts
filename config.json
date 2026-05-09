@@ -11,8 +11,8 @@
     "trading": {
         "mode": "paper",
         "symbols": ["BTC/USDT", "ETH/USDT"],
-        "base_timeframe": "15m",
-        "htf_timeframes": ["1h", "4h", "1d", "1w"],
+        "base_timeframe": "1m",
+        "htf_timeframes": ["5m", "15m", "1h"],
         "risk_per_trade_pct": 1.0,
         "algorithm_version": "v4"
     },

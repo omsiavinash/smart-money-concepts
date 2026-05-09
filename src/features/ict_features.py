@@ -60,6 +60,11 @@ class ICTFeatures:
         self.df['bearish_fvg'] = bearish_fvg.astype(int)
         self.df['fvg'] = np.where(bullish_fvg, 1, np.where(bearish_fvg, -1, 0))
 
+        # Calculate FVG Exact Boundaries
+        # For Bullish FVG, the gap is between candle i-1 High and candle i+1 Low
+        self.df['fvg_upper'] = np.where(bullish_fvg, self.df['low'], np.where(bearish_fvg, self.df['low'].shift(2), np.nan))
+        self.df['fvg_lower'] = np.where(bullish_fvg, self.df['high'].shift(2), np.where(bearish_fvg, self.df['high'], np.nan))
+
     def detect_order_blocks(self, move_threshold: float = 0.004):
         """
         3. Order Blocks (OB)
@@ -81,6 +86,10 @@ class ICTFeatures:
         self.df['bullish_ob'] = bullish_ob.astype(int)
         self.df['bearish_ob'] = bearish_ob.astype(int)
         self.df['ob'] = np.where(bullish_ob, 1, np.where(bearish_ob, -1, 0))
+
+        # Calculate OB Exact Boundaries (The consolidation candle before the break)
+        self.df['ob_upper'] = np.where(bullish_ob | bearish_ob, self.df['high'].shift(1), np.nan)
+        self.df['ob_lower'] = np.where(bullish_ob | bearish_ob, self.df['low'].shift(1), np.nan)
 
     def detect_liquidity_grabs(self, window: int = 10, spike_threshold: float = 0.001):
         """

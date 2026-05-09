@@ -132,6 +132,9 @@ class TradingBotDaemon:
 
             use_ai = self.config["model"].get("use_ai_inference", True)
 
+            o, h, l, c = current_data.get('open', 0), current_data.get('high', 0), current_data.get('low', 0), current_data.get('close', 0)
+            self._log_thought_process(symbol, f"Candle closed at OHLC: [{o:.4f}, {h:.4f}, {l:.4f}, {c:.4f}]")
+
             if self.ai_model is not None and len(base_features_df) >= self.seq_length and use_ai:
                 # Normalize inputs using the global scaler saved during training
                 normalized_features = (base_features_df[self.feature_cols] - self.scaler_mean) / (self.scaler_std + 1e-8)
@@ -172,6 +175,8 @@ class TradingBotDaemon:
                         htf_data['liquidity_grab'] = latest_htf['liquidity_grab']
                     if latest_htf.get('ob', 0) != 0:
                         htf_data['ob'] = latest_htf['ob']
+                        htf_data['ob_upper'] = latest_htf.get('ob_upper', 0)
+                        htf_data['ob_lower'] = latest_htf.get('ob_lower', 0)
 
             # 3. Strategy & Signal Generation
             signal = self.strategy.generate_signal(current_data, htf_data)
@@ -239,7 +244,7 @@ class TradingBotDaemon:
         file_path = "data/bot_logs.csv"
 
         log_data = {
-            "timestamp": datetime.datetime.now().isoformat(),
+            "timestamp": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
             "symbol": symbol,
             "message": message
         }
@@ -258,7 +263,7 @@ class TradingBotDaemon:
 
         file_path = "data/signals.csv"
         sig_data = {
-            "timestamp": datetime.datetime.now().isoformat(),
+            "timestamp": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
             "symbol": symbol,
             "action": signal["action"],
             "confidence": signal["confidence"],
@@ -271,18 +276,28 @@ class TradingBotDaemon:
         else:
             df_new.to_csv(file_path, mode='w', header=True, index=False)
 
-    def start(self, interval_seconds: int = 900): # 900s = 15m
+    def start(self):
         """
-        Starts the continuous daemon loop.
+        Starts the continuous daemon loop, calculating sleep interval dynamically.
         """
         logger.info("Starting ICT Trading Bot Daemon...")
+
+        # Calculate interval dynamically based on base_timeframe config
+        base_tf = self.config["trading"]["base_timeframe"]
+        tf_minutes = 15
+        if base_tf.endswith('m'): tf_minutes = int(base_tf[:-1])
+        elif base_tf.endswith('h'): tf_minutes = int(base_tf[:-1]) * 60
+        elif base_tf.endswith('d'): tf_minutes = int(base_tf[:-1]) * 1440
+
+        interval_seconds = tf_minutes * 60
+
         while True:
             try:
                 self.run_cycle()
             except Exception as e:
                 logger.error(f"Error in main loop: {e}")
 
-            logger.info(f"Sleeping for {interval_seconds} seconds...")
+            logger.info(f"Sleeping for {interval_seconds} seconds ({tf_minutes} minutes)...")
             time.sleep(interval_seconds)
 
 if __name__ == "__main__":

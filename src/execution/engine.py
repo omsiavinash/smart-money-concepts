@@ -97,7 +97,7 @@ class ExecutionEngine:
 
         import datetime
         trade_details = {
-            "timestamp": datetime.datetime.now().isoformat(),
+            "timestamp": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
             "symbol": symbol,
             "action": action,
             "quantity": round(qty, 4),

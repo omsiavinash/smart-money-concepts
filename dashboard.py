@@ -9,9 +9,15 @@ def load_config():
     with open("config.json", 'r') as f:
         return json.load(f)
 
+import time
+
 def main():
     st.title("📈 ICT-AI Trading Bot Dashboard")
     st.markdown("Monitor real-time paper and live trading state.")
+
+    # Auto-refresh setup
+    st.sidebar.header("Dashboard Controls")
+    auto_refresh = st.sidebar.checkbox("Auto-Refresh (10s)", value=True)
 
     config = load_config()
     st.sidebar.header("Bot Configuration")
@@ -74,6 +80,10 @@ def main():
             st.info("No bot logs generated yet. Ensure main.py is running.")
     else:
         st.info("No bot logs generated yet. Ensure main.py is running.")
+
+    if auto_refresh:
+        time.sleep(10)
+        st.rerun()
 
 if __name__ == "__main__":
     main()
