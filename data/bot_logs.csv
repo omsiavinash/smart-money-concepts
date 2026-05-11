@@ -204,3 +204,40 @@ timestamp,symbol,message
 2026-05-09 08:49:11 UTC,ETH/USDT,"[DIAGNOSTIC] AI Model predicted: MSS=0, FVG=0, OB=0"
 2026-05-09 08:49:11 UTC,ETH/USDT,Checking for Mandatory Market Structure Shift (MSS)...
 2026-05-09 08:49:11 UTC,ETH/USDT,Not Detected. Mandatory MSS missing.
+2026-05-09 08:50:02 UTC,BTC/USDT,Starting analysis cycle for BTC/USDT on 1m timeframe.
+2026-05-09 08:50:06 UTC,BTC/USDT,"Successfully fetched 100 recent candles for ['1m', '5m', '15m', '1h']."
+2026-05-09 08:50:06 UTC,BTC/USDT,"Candle closed at OHLC: [80420.1000, 80420.2000, 80420.1000, 80420.1000]"
+2026-05-09 08:50:06 UTC,BTC/USDT,"[DIAGNOSTIC] Math logic found: MSS=0, FVG=-1, OB=0"
+2026-05-09 08:50:06 UTC,BTC/USDT,"[DIAGNOSTIC] AI Model predicted: MSS=0, FVG=0, OB=0"
+2026-05-09 08:50:06 UTC,BTC/USDT,Checking for Mandatory Market Structure Shift (MSS)...
+2026-05-09 08:50:06 UTC,BTC/USDT,Not Detected. Mandatory MSS missing.
+2026-05-09 08:50:06 UTC,ETH/USDT,Starting analysis cycle for ETH/USDT on 1m timeframe.
+2026-05-09 08:50:11 UTC,ETH/USDT,"Successfully fetched 100 recent candles for ['1m', '5m', '15m', '1h']."
+2026-05-09 08:50:11 UTC,ETH/USDT,"Candle closed at OHLC: [2317.3000, 2317.3000, 2317.3000, 2317.3000]"
+2026-05-09 08:50:11 UTC,ETH/USDT,"[DIAGNOSTIC] Math logic found: MSS=0, FVG=0, OB=0"
+2026-05-09 08:50:11 UTC,ETH/USDT,"[DIAGNOSTIC] AI Model predicted: MSS=0, FVG=0, OB=0"
+2026-05-09 08:50:11 UTC,ETH/USDT,Checking for Mandatory Market Structure Shift (MSS)...
+2026-05-09 08:50:11 UTC,ETH/USDT,Not Detected. Mandatory MSS missing.
+2026-05-11 07:33:58 UTC,BTC/USDT,Starting analysis cycle for BTC/USDT on 1m timeframe.
+2026-05-11 07:34:03 UTC,BTC/USDT,"Successfully fetched 100 recent candles for ['1m', '5m', '15m', '1h']."
+2026-05-11 07:34:03 UTC,ETH/USDT,Starting analysis cycle for ETH/USDT on 1m timeframe.
+2026-05-11 07:34:08 UTC,ETH/USDT,"Successfully fetched 100 recent candles for ['1m', '5m', '15m', '1h']."
+2026-05-11 07:34:08 UTC,ETH/USDT,"Candle closed at OHLC: [2330.8200, 2330.8200, 2329.0100, 2329.0100]"
+2026-05-11 07:34:08 UTC,ETH/USDT,"[DIAGNOSTIC] Math logic found: MSS=0, FVG=0, OB=0"
+2026-05-11 07:34:08 UTC,ETH/USDT,"[DIAGNOSTIC] AI Model predicted: MSS=0, FVG=-1, OB=0"
+2026-05-11 07:34:08 UTC,ETH/USDT,Checking for Mandatory Market Structure Shift (MSS)...
+2026-05-11 07:34:08 UTC,ETH/USDT,Not Detected. Mandatory MSS missing.
+2026-05-11 07:35:02 UTC,BTC/USDT,Starting analysis cycle for BTC/USDT on 1m timeframe.
+2026-05-11 07:35:06 UTC,BTC/USDT,"Successfully fetched 100 recent candles for ['1m', '5m', '15m', '1h']."
+2026-05-11 07:35:06 UTC,BTC/USDT,"Candle closed at OHLC: [80686.2000, 80708.8000, 80686.2000, 80708.8000]"
+2026-05-11 07:35:06 UTC,BTC/USDT,"[DIAGNOSTIC] Math logic found: MSS=0, FVG=-1, OB=0"
+2026-05-11 07:35:06 UTC,BTC/USDT,"[DIAGNOSTIC] AI Model predicted: MSS=0, FVG=0, OB=0"
+2026-05-11 07:35:06 UTC,BTC/USDT,Checking for Mandatory Market Structure Shift (MSS)...
+2026-05-11 07:35:06 UTC,BTC/USDT,Not Detected. Mandatory MSS missing.
+2026-05-11 07:35:06 UTC,ETH/USDT,Starting analysis cycle for ETH/USDT on 1m timeframe.
+2026-05-11 07:35:11 UTC,ETH/USDT,"Successfully fetched 100 recent candles for ['1m', '5m', '15m', '1h']."
+2026-05-11 07:35:11 UTC,ETH/USDT,"Candle closed at OHLC: [2329.0400, 2329.0400, 2329.0400, 2329.0400]"
+2026-05-11 07:35:11 UTC,ETH/USDT,"[DIAGNOSTIC] Math logic found: MSS=0, FVG=-1, OB=0"
+2026-05-11 07:35:11 UTC,ETH/USDT,"[DIAGNOSTIC] AI Model predicted: MSS=0, FVG=-1, OB=0"
+2026-05-11 07:35:11 UTC,ETH/USDT,Checking for Mandatory Market Structure Shift (MSS)...
+2026-05-11 07:35:11 UTC,ETH/USDT,Not Detected. Mandatory MSS missing.
