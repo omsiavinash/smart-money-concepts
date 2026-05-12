@@ -15,8 +15,10 @@ class ICTFeatures:
         self.df['swing_low'] = self.df['low'] == self.df['low'].rolling(window=window).min()
 
         # Forward fill the recent swing prices for reference
-        self.df['recent_swing_high'] = self.df['high'].where(self.df['swing_high']).ffill()
-        self.df['recent_swing_low'] = self.df['low'].where(self.df['swing_low']).ffill()
+        # We shift by 1 before ffill so the current candle compares itself to the PREVIOUS swing high,
+        # not a swing high it might be forming right now.
+        self.df['recent_swing_high'] = self.df['high'].where(self.df['swing_high']).shift(1).ffill()
+        self.df['recent_swing_low'] = self.df['low'].where(self.df['swing_low']).shift(1).ffill()
 
     def detect_mss(self, window: int = 20, momentum_threshold: float = 0.003, volume_multiplier: float = 1.5):
         """
@@ -29,14 +31,16 @@ class ICTFeatures:
         self.df['avg_volume'] = self.df['volume'].rolling(window=window).mean()
         self.df['momentum'] = (self.df['close'] - self.df['open']) / self.df['open']
 
+        # We strictly check that the current close is > the established recent swing high.
+        # recent_swing_high is already shifted backwards by 1 in the _swing_highs_lows function.
         bullish_mss_cond = (
-            (self.df['close'] > self.df['recent_swing_high'].shift(1)) &
+            (self.df['close'] > self.df['recent_swing_high']) &
             (self.df['momentum'] > momentum_threshold) &
             (self.df['volume'] > self.df['avg_volume'] * volume_multiplier)
         )
 
         bearish_mss_cond = (
-            (self.df['close'] < self.df['recent_swing_low'].shift(1)) &
+            (self.df['close'] < self.df['recent_swing_low']) &
             (self.df['momentum'] < -momentum_threshold) &
             (self.df['volume'] > self.df['avg_volume'] * volume_multiplier)
         )

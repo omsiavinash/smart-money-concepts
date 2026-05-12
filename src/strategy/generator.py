@@ -37,11 +37,17 @@ class ICTStrategy:
         process_log.append(f"Checking for Mandatory Market Structure Shift (MSS)...")
         if current.get('mss') == 1:
             direction = 1 # Bullish
-            mss_reason = f"Detected (Bullish MSS) - Close Price {close_price:.4f} broke above recent Swing High {swing_high:.4f}."
+            if close_price > swing_high:
+                mss_reason = f"Detected (Bullish MSS) - Close Price {close_price:.4f} broke above recent Swing High {swing_high:.4f}."
+            else:
+                mss_reason = f"Detected (Bullish MSS) - Triggered by AI Prediction Override (Math: {close_price:.4f} did not break {swing_high:.4f})."
             process_log.append(mss_reason)
         elif current.get('mss') == -1:
             direction = -1 # Bearish
-            mss_reason = f"Detected (Bearish MSS) - Close Price {close_price:.4f} broke below recent Swing Low {swing_low:.4f}."
+            if close_price < swing_low:
+                mss_reason = f"Detected (Bearish MSS) - Close Price {close_price:.4f} broke below recent Swing Low {swing_low:.4f}."
+            else:
+                mss_reason = f"Detected (Bearish MSS) - Triggered by AI Prediction Override (Math: {close_price:.4f} did not break {swing_low:.4f})."
             process_log.append(mss_reason)
         else:
             process_log.append("Not Detected. Mandatory MSS missing.")
@@ -131,9 +137,15 @@ class ICTStrategy:
             return {"action": None, "thought_process": process_log}
 
         if direction == 1:
-            mss_reason = f"Detected (Bullish MSS) - Close Price {close_price:.4f} broke above recent Swing High {swing_high:.4f}."
+            if close_price > swing_high:
+                mss_reason = f"Detected (Bullish MSS) - Close Price {close_price:.4f} broke above recent Swing High {swing_high:.4f}."
+            else:
+                mss_reason = f"Detected (Bullish MSS) - Triggered by AI Prediction Override (Math: {close_price:.4f} did not break {swing_high:.4f})."
         else:
-            mss_reason = f"Detected (Bearish MSS) - Close Price {close_price:.4f} broke below recent Swing Low {swing_low:.4f}."
+            if close_price < swing_low:
+                mss_reason = f"Detected (Bearish MSS) - Close Price {close_price:.4f} broke below recent Swing Low {swing_low:.4f}."
+            else:
+                mss_reason = f"Detected (Bearish MSS) - Triggered by AI Prediction Override (Math: {close_price:.4f} did not break {swing_low:.4f})."
 
         process_log.append(mss_reason)
 

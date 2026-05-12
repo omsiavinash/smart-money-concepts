@@ -133,7 +133,13 @@ class TradingBotDaemon:
             use_ai = self.config["model"].get("use_ai_inference", True)
 
             o, h, l, c = current_data.get('open', 0), current_data.get('high', 0), current_data.get('low', 0), current_data.get('close', 0)
-            self._log_thought_process(symbol, f"Candle closed at OHLC: [{o:.4f}, {h:.4f}, {l:.4f}, {c:.4f}]")
+            volume = current_data.get('volume', 0)
+            self._log_thought_process(symbol, f"Candle closed at OHLC: [{o:.4f}, {h:.4f}, {l:.4f}, {c:.4f}] | Vol: {volume:.4f}")
+
+            # Skip processing if candle has absolutely zero volume (e.g. frozen/delisted market)
+            if volume == 0.0 or (o == h and h == l and l == c):
+                self._log_thought_process(symbol, "Candle has zero volume or flat OHLC. Market frozen or low liquidity. Skipping cycle.")
+                continue
 
             # To capture raw math before AI overrides it
             raw_math_data = current_data.copy()

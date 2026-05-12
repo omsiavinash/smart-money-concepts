@@ -1,6 +1,6 @@
 {
     "exchange": {
-        "name": "kraken",
+        "name": "binance",
         "api_key": "YOUR_API_KEY",
         "api_secret": "YOUR_API_SECRET",
         "enable_rate_limit": true,
@@ -28,6 +28,6 @@
         "batch_size": 32,
         "epochs": 100,
         "model_path": "models/ict_lstm_model.pth",
-        "use_ai_inference": true
+        "use_ai_inference": false
     }
 }
